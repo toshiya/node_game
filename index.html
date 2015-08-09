@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title> just a toy</title>
+  <style>
+  canvas {
+    border : solid 1px #999;
+  }
+  </style>
+</head>
+<body>
+
+  <canvas id="cvs" width="300" height="400"></canvas>
+  <script src="./index.js"></script>
+
+  <div>
+    <button id="start_button">ゲームスタート</button>
+  </div>
+  
+  <div id="score"></div>
+
+  <audio id="bullet_sound" preload="auto">
+    <source src="assets/sound/laser1.mp3" type="audio/mp3">
+  </audio>
+  
+  <audio id="destruction_sound" preload="auto">
+    <source src="assets/sound/destruction1.mp3" type="audio/mp3">
+  </audio>
+  
+  <audio id="bomb_sound" preload="auto">
+    <source src="assets/sound/bomb.mp3" type="audio/mp3">
+  </audio>
+
+</body>
+</html>
