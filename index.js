@@ -28,7 +28,6 @@ function AirPlane () {
             _this.x - (_this.width/2), _this.y - (_this.height/2), _this.width, _this.height
         );
     };
-  
 }
 
 function Bullet () {
@@ -67,6 +66,37 @@ function Bullet () {
     }
 }
 
+function Circle () {
+    var _this = this;
+    this.x            = 100;
+    this.y            = 0;
+    this.r            = 20;
+    this.fall_step    = 2;
+
+    this.move = function move () {
+        _this.y += _this.fall_step;
+    };
+    
+    this.draw = function draw (ctx) {
+        ctx.beginPath();
+        ctx.arc(_this.x, _this.y, _this.r, 0, Math.PI * 2, false);
+        ctx.stroke();
+    };
+  
+    this.reset = function (w) {
+        _this.x = Math.round(w * Math.random());
+        _this.y = 0;
+    };
+
+    this.detect_collisoin = function (x, y, cb) {
+        var distance2 = Math.pow((x - _this.x), 2) + Math.pow((y - _this.y), 2);
+        if ( distance2 < Math.pow(_this.r, 2) ) {
+            return cb(_this);
+        }
+        return 0;
+    };
+}
+
 function CircleFall () {
   // Canvas Info
   var _this = this;
@@ -75,105 +105,94 @@ function CircleFall () {
   this.score_div     = document.getElementById('score');
   this.canvas_height = 400;
   this.canvas_width  = 300;
-  
+
   // Sound
   this.destruction_sound = document.getElementById('destruction_sound');
   this.bomb_sound = document.getElementById('bomb_sound');
 
-  // AirPlane
+  // Objects
   this.airplane = new AirPlane();
   this.bullet   = new Bullet();
+  this.circle   = new Circle();
 
-  // Circle Info
-  this.cx            = 100;
-  this.cy            = 0;
-  this.cr            = 20;
-  this.fall_step     = 2;
-  this.fall_interval = 10;
-
-  // Score Info
+  // Score
   this.total_score     = 0;
   this.score_per_break = 1;
 
-  // Game Info
+  // Control
   this.total_circle_num = 0;
   this.max_circle_num   = 100;
+  this.interval = 10;
 
   this.init = function () {
     document.addEventListener('mousemove', _this.airplane.move);
     document.addEventListener('click', _this.fire_bullet);
   };
 
-
   this.loop = function () {
     _this.ctx.clearRect(0, 0 , _this.canvas_width, _this.canvas_height);
 
     _this.bullet.move();
+    _this.circle.move();
+    
     _this.bullet.draw(_this.ctx);
     _this.airplane.draw(_this.ctx);
-    
-    _this.draw_circle();
-    _this.update_score();
+    _this.circle.draw(_this.ctx);
 
-    if (_this.is_chara_in_circle()) {
-      _this.ctx.clearRect(0, 0, _this.canvas_width, _this.canvas_height);
-      _this.end_score();
-      return;
+    _this.update_score();
+    
+    if (_this.circle.y > _this.canvas_height) {
+        _this.circle.reset(_this.canvas_width);
+        _this.total_circle_num += 1;
     }
 
-    _this.cy += _this.fall_step;
-    if (_this.cy < _this.canvas_height) {
-      var score = _this.is_bullet_in_circle();
-      if (score > 0) {
+    var r = _this.circle.detect_collisoin(_this.airplane.x, _this.airplane.y, function (circle) {
+        _this.bomb_sound.currentTime = 0;
+        _this.bomb_sound.play();
+        return 1;
+    }); 
+    if (r) {
+        _this.ctx.clearRect(0, 0, _this.canvas_width, _this.canvas_height);
+        _this.end_score();
+        return;
+    }
+
+    var score = _this.circle.detect_collisoin(_this.bullet.x, _this.bullet.y, function (circle) {
+        _this.bullet.exist = 0;
+        _this.destruction_sound.currentTime = 0;
+        _this.destruction_sound.play();
+        return _this.score_per_break;
+    });
+    if (score > 0) {
         _this.total_score += score;
-        _this.reset_circle();
+        _this.circle.reset(_this.canvas_width);
         _this.total_circle_num += 1;
-      }
-    } 
-    else {
-      _this.reset_circle();
-      _this.total_circle_num += 1;
     }
 
     if (_this.total_circle_num <= _this.max_circle_num) {
-      _this.setNextLoop();
-    } else {
-      _this.ctx.clearRect(0, 0, _this.canvas_width, _this.canvas_height);
-      _this.end_score();
-    }
-  };
-
-  this.is_bullet_in_circle = function () {
-    var distance2 = Math.pow((_this.bullet.x - _this.cx), 2) + Math.pow((_this.bullet.y - _this.cy), 2);
-    if ( distance2 < Math.pow(_this.cr, 2) ) {
-      _this.bullet.exist = 0;
-      _this.destruction_sound.currentTime = 0;
-      _this.destruction_sound.play();
-      return _this.score_per_break;
-    }
-    return 0;
-  }
-
-  this.is_chara_in_circle = function () {
-    var distance2 = Math.pow((_this.airplane.x - _this.cx), 2) + Math.pow((_this.airplane.y - _this.cy), 2);
-    if ( distance2 < Math.pow(_this.cr, 2) ) {
-      _this.bomb_sound.currentTime = 0;
-      _this.bomb_sound.play();
-      return 1;
-    }
-    return 0;
-  }
-
-  this.draw_circle = function () {
-    _this.ctx.beginPath();
-    _this.ctx.arc(_this.cx, _this.cy, _this.cr, 0, Math.PI * 2, false);
-    _this.ctx.stroke();
+        _this.setNextLoop();
+        return;
+    } 
+      
+    _this.ctx.clearRect(0, 0, _this.canvas_width, _this.canvas_height);
+    _this.end_score();
+    return;
   };
 
   this.fire_bullet = function () {
       _this.bullet.fire(_this.airplane.x, _this.airplane.y, _this.canvas_width, _this.canvas_height);
   };
-
+  
+  this.setNextLoop = function () {
+    clearTimeout();
+    setTimeout(function () { _this.loop(); }, _this.interval);
+  };
+  
+  this.reset = function () {
+    _this.circle.reset(_this.canvas_width);
+    _this.total_circle_num = 0;
+    _this.total_score      = 0;
+  };
 
   this.update_score = function () {
     _this.score_div.innerHTML = 
@@ -187,19 +206,4 @@ function CircleFall () {
       + "/"  + (_this.total_circle_num) + "</h3>";
   };
 
-  this.reset_circle = function () {
-    _this.cx = Math.round(_this.canvas_width * Math.random());
-    _this.cy = 0;
-  };
-
-  this.setNextLoop = function () {
-    clearTimeout();
-    setTimeout(function () { _this.loop(); }, _this.fall_interval);
-  }
-
-  this.reset = function () {
-    this.reset_circle();
-    this.total_circle_num = 0;
-    this.total_score      = 0;
-  };
 }
