@@ -8,17 +8,63 @@ window.onload = function() {
 }
 
 function AirPlane () {
-  var _this = this;
-  this.x = 0;
-  this.y = 0;
-  this.height = 30;
-  this.width  = 30;
-  this.img;
+    var _this = this;
+    this.x = 150;
+    this.y = 400 ;
+    this.height = 30;
+    this.width  = 30;
+    this.image  = new Image();
+    this.image.src = "./assets/icon/airplane.png";
 
-  this.move = function () {
+    this.move = function(e) {
+        _this.x = e.clientX;
+        _this.y = e.clientY;
+    };
+  
+    this.draw = function (ctx) {
+        ctx.drawImage(
+            _this.image, 
+            0, 0, _this.image.width, _this.image.height,
+            _this.x - (_this.width/2), _this.y - (_this.height/2), _this.width, _this.height
+        );
+    };
+  
+}
 
-  };
-
+function Bullet () {
+    var _this = this;
+    this.x     = 0;
+    this.y     = 0;
+    this.r     = 5;
+    this.exist = 0;
+    this.step  = 5;
+    this.fire_sound = document.getElementById('bullet_sound');
+  
+    this.move = function () {
+        if (_this.exist === 1 && _this.y > 0) {
+            _this.y -= _this.step;
+        } else {
+            _this.exist = 0;
+        }
+    };
+    
+    this.draw = function (ctx) {
+        if (_this.exist === 1) {
+            ctx.beginPath();
+            ctx.arc(_this.x, _this.y, _this.r, 0, Math.PI * 2, false);
+            ctx.stroke();
+        }
+    };
+  
+    this.fire = function (x, y, w, h) {
+        if ( 0 < x && x < w && 0 < y && y < h) { 
+            _this.x     = x;
+            _this.y     = y;
+            _this.exist = 1;
+            _this.fire_sound.currentTime = 0;
+            _this.fire_sound.play();
+        }
+    }
 }
 
 function CircleFall () {
@@ -29,9 +75,14 @@ function CircleFall () {
   this.score_div     = document.getElementById('score');
   this.canvas_height = 400;
   this.canvas_width  = 300;
-  this.bullet_sound = document.getElementById('bullet_sound');
+  
+  // Sound
   this.destruction_sound = document.getElementById('destruction_sound');
   this.bomb_sound = document.getElementById('bomb_sound');
+
+  // AirPlane
+  this.airplane = new AirPlane();
+  this.bullet   = new Bullet();
 
   // Circle Info
   this.cx            = 100;
@@ -39,20 +90,6 @@ function CircleFall () {
   this.cr            = 20;
   this.fall_step     = 2;
   this.fall_interval = 10;
-
-  // Chara Info
-  this.chx = 0;
-  this.chy = 0;
-  this.chheight = 30;
-  this.chwidth  = 30;
-  this.chimg;
-
-  // bullet info
-  this.bullet_x     = 0;
-  this.bullet_y     = 0;
-  this.bullet_r     = 5;
-  this.bullet_exist = 0;
-  this.bullet_step  = 5;
 
   // Score Info
   this.total_score     = 0;
@@ -63,24 +100,19 @@ function CircleFall () {
   this.max_circle_num   = 100;
 
   this.init = function () {
-    document.addEventListener('mousemove', _this.chara_move);
+    document.addEventListener('mousemove', _this.airplane.move);
     document.addEventListener('click', _this.fire_bullet);
-    _this.chimg = new Image();
-    _this.chimg.src = "./assets/icon/airplane.png";
   };
 
-  this.chara_move = function(e) {
-      _this.chx = e.clientX;
-      _this.chy = e.clientY;
-  };
 
   this.loop = function () {
     _this.ctx.clearRect(0, 0 , _this.canvas_width, _this.canvas_height);
 
-    _this.move_bullet();
+    _this.bullet.move();
+    _this.bullet.draw(_this.ctx);
+    _this.airplane.draw(_this.ctx);
+    
     _this.draw_circle();
-    _this.draw_chara();
-    _this.draw_bullet();
     _this.update_score();
 
     if (_this.is_chara_in_circle()) {
@@ -112,9 +144,9 @@ function CircleFall () {
   };
 
   this.is_bullet_in_circle = function () {
-    var distance2 = Math.pow((_this.bullet_x - _this.cx), 2) + Math.pow((_this.bullet_y - _this.cy), 2);
+    var distance2 = Math.pow((_this.bullet.x - _this.cx), 2) + Math.pow((_this.bullet.y - _this.cy), 2);
     if ( distance2 < Math.pow(_this.cr, 2) ) {
-      _this.bullet_exist = 0;
+      _this.bullet.exist = 0;
       _this.destruction_sound.currentTime = 0;
       _this.destruction_sound.play();
       return _this.score_per_break;
@@ -123,7 +155,7 @@ function CircleFall () {
   }
 
   this.is_chara_in_circle = function () {
-    var distance2 = Math.pow((_this.chx - _this.cx), 2) + Math.pow((_this.chy - _this.cy), 2);
+    var distance2 = Math.pow((_this.airplane.x - _this.cx), 2) + Math.pow((_this.airplane.y - _this.cy), 2);
     if ( distance2 < Math.pow(_this.cr, 2) ) {
       _this.bomb_sound.currentTime = 0;
       _this.bomb_sound.play();
@@ -138,44 +170,10 @@ function CircleFall () {
     _this.ctx.stroke();
   };
 
-  this.draw_chara = function () {
-    _this.ctx.drawImage(_this.chimg, 
-        0, 0, _this.chimg.width, _this.chimg.height,
-        _this.chx - (_this.chwidth/2), _this.chy - (_this.chheight/2), _this.chwidth, _this.chheight
-        );
-  };
-
   this.fire_bullet = function () {
-    if ( 
-           0 < _this.chx 
-        && _this.chx < _this.canvas_width
-        && 0 < _this.chy 
-        && _this.chy < _this.canvas_height 
-        && _this.bullet_exist === 0
-       ) { 
-      _this.bullet_x     = _this.chx;
-      _this.bullet_y     = _this.chy;
-      _this.bullet_exist = 1;
-      _this.bullet_sound.currentTime = 0;
-      _this.bullet_sound.play();
-    }
+      _this.bullet.fire(_this.airplane.x, _this.airplane.y, _this.canvas_width, _this.canvas_height);
   };
 
-  this.move_bullet = function () {
-    if (_this.bullet_exist == 1 && _this.bullet_y > 0) {
-      _this.bullet_y -= _this.bullet_step;
-    } else {
-      _this.bullet_exist = 0;
-    }
-  };
-
-  this.draw_bullet = function () {
-    if (_this.bullet_exist == 1) {
-      _this.ctx.beginPath();
-      _this.ctx.arc(_this.bullet_x, _this.bullet_y, _this.bullet_r, 0, Math.PI * 2, false);
-      _this.ctx.stroke();
-    }
-  };
 
   this.update_score = function () {
     _this.score_div.innerHTML = 
