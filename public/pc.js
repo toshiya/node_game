@@ -5,17 +5,17 @@ window.onload = function() {
     g.reset(); 
     g.loop(); 
   });
-  
 }
 
 function AirPlane () {
     var _this = this;
-    this.x = 500;
+    this.x = 250;
     this.y = 400 ;
     this.a_x = 0;
     this.a_y = 0 ;
-    this.alpha_x = 10.0;
-    this.alpha_y = 10.0;
+    this.alpha_x   = 15.0;
+    this.alpha_y   = 15.0;
+    this.viscosity = 0.9;
     
     this.height = 30;
     this.width  = 30;
@@ -25,6 +25,9 @@ function AirPlane () {
     this.move = function(x, y) {
         _this.x += _this.a_x * _this.alpha_x;
         _this.y += _this.a_y * _this.alpha_y;
+
+        _this.a_x *= _this.viscosity;
+        _this.a_y *= _this.viscosity;
     };
     
     this.setAccele = function(ax, ay, az) {
@@ -46,33 +49,33 @@ function Bullet () {
     this.x     = 0;
     this.y     = 0;
     this.r     = 5;
-    this.exist = 0;
     this.step  = 5;
     this.fire_sound = document.getElementById('bullet_sound');
   
     this.move = function () {
-        if (_this.exist === 1 && _this.y > 0) {
+        if (_this.y > 0) {
             _this.y -= _this.step;
+            return 1;
         } else {
-            _this.exist = 0;
+            return -1;
         }
     };
     
     this.draw = function (ctx) {
-        if (_this.exist === 1) {
-            ctx.beginPath();
-            ctx.arc(_this.x, _this.y, _this.r, 0, Math.PI * 2, false);
-            ctx.stroke();
-        }
+        ctx.beginPath();
+        ctx.arc(_this.x, _this.y, _this.r, 0, Math.PI * 2, false);
+        ctx.stroke();
     };
   
     this.fire = function (x, y, w, h) {
         if ( 0 < x && x < w && 0 < y && y < h) { 
             _this.x     = x;
             _this.y     = y;
-            _this.exist = 1;
             _this.fire_sound.currentTime = 0;
             _this.fire_sound.play();
+            return 1;
+        } else {
+            return 0;
         }
     }
 }
@@ -114,8 +117,8 @@ function CircleFall () {
   this.canvas        = document.getElementById('cvs');
   this.ctx           = this.canvas.getContext('2d');
   this.score_div     = document.getElementById('score');
-  this.canvas_height = 600;
-  this.canvas_width  = 1000;
+  this.canvas.height = 600;
+  this.canvas.width  = 500;
 
   // Sound
   this.destruction_sound = document.getElementById('destruction_sound');
@@ -123,7 +126,7 @@ function CircleFall () {
 
   // Objects
   this.airplane = new AirPlane();
-  this.bullet   = new Bullet();
+  this.bullets  = new Array();
   this.circle   = new Circle();
 
   // Score
@@ -139,8 +142,6 @@ function CircleFall () {
   this.socket;
 
   this.init = function () {
-    //document.addEventListener('mousemove', _this.airplane.moveTo);
-    document.addEventListener('click', _this.fire_bullet);
     _this.socket = io.connect("http://node.comonsense.net");
     
     _this.socket.on("sendMessageToClient", function (data) {
@@ -155,58 +156,83 @@ function CircleFall () {
   };
 
   this.loop = function () {
-    _this.ctx.clearRect(0, 0 , _this.canvas_width, _this.canvas_height);
-
-    _this.airplane.move();
-    _this.bullet.move();
-    _this.circle.move();
+    var score = 0;
+    var r, k;
     
-    _this.bullet.draw(_this.ctx);
-    _this.airplane.draw(_this.ctx);
-    _this.circle.draw(_this.ctx);
-
-    _this.update_score();
+    _this.ctx.clearRect(0, 0 , _this.canvas.width, _this.canvas.height);
     
-    if (_this.circle.y > _this.canvas_height) {
-        _this.circle.reset(_this.canvas_width);
+    // Bullets Control
+    for (k in _this.bullets) {  
+        r = _this.bullets[k].move();
+        if (r === 1) {
+            _this.bullets[k].draw(_this.ctx);
+        } else {
+            _this.bullets.splice(k, 1); 
+        }
+    }
+    
+    for (k in _this.bullets) {  
+        r = _this.circle.detect_collisoin(_this.bullets[k].x, _this.bullets[k].y, function (circle) {
+            _this.destruction_sound.currentTime = 0;
+            _this.destruction_sound.play();
+            return _this.score_per_break;
+        });
+
+        if (r > 0) {
+            score += r;
+            _this.bullets.splice(k, 1); 
+        }
+    };
+    if (score > 0) {
+        _this.total_score += score;
+        _this.circle.reset(_this.canvas.width);
         _this.total_circle_num += 1;
     }
 
-    var r = _this.circle.detect_collisoin(_this.airplane.x, _this.airplane.y, function (circle) {
+
+    // Airplane Control
+    _this.airplane.move();
+    _this.airplane.draw(_this.ctx);
+    
+    // Circle Control
+    _this.circle.move();
+    _this.circle.draw(_this.ctx);
+    
+    r = _this.circle.detect_collisoin(_this.airplane.x, _this.airplane.y, function (circle) {
         _this.bomb_sound.currentTime = 0;
         _this.bomb_sound.play();
         return 1;
     }); 
     if (r) {
-        _this.ctx.clearRect(0, 0, _this.canvas_width, _this.canvas_height);
+        _this.ctx.clearRect(0, 0, _this.canvas.width, _this.canvas.height);
         _this.end_score();
         return;
     }
-
-    var score = _this.circle.detect_collisoin(_this.bullet.x, _this.bullet.y, function (circle) {
-        _this.bullet.exist = 0;
-        _this.destruction_sound.currentTime = 0;
-        _this.destruction_sound.play();
-        return _this.score_per_break;
-    });
-    if (score > 0) {
-        _this.total_score += score;
-        _this.circle.reset(_this.canvas_width);
+    
+    if (_this.circle.y > _this.canvas.height) {
+        _this.circle.reset(_this.canvas.width);
         _this.total_circle_num += 1;
     }
+   
 
+    // Main Control
+    _this.update_score();
     if (_this.total_circle_num <= _this.max_circle_num) {
         _this.setNextLoop();
         return;
     } 
-      
-    _this.ctx.clearRect(0, 0, _this.canvas_width, _this.canvas_height);
+    _this.ctx.clearRect(0, 0, _this.canvas.width, _this.canvas.height);
     _this.end_score();
+    
     return;
   };
 
   this.fire_bullet = function () {
-      _this.bullet.fire(_this.airplane.x, _this.airplane.y, _this.canvas_width, _this.canvas_height);
+      var b = new Bullet();
+      var r = b.fire(_this.airplane.x, _this.airplane.y, _this.canvas.width, _this.canvas.height);
+      if (r === 1) {
+          _this.bullets.push(b);
+      }
   };
   
   this.setNextLoop = function () {
@@ -215,7 +241,7 @@ function CircleFall () {
   };
   
   this.reset = function () {
-    _this.circle.reset(_this.canvas_width);
+    _this.circle.reset(_this.canvas.width);
     _this.total_circle_num = 0;
     _this.total_score      = 0;
   };
