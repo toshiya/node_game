@@ -4,6 +4,7 @@ window.onload = function() {
     g.init();
     g.reset(); 
     g.loop(); 
+    g.generate_circle(); 
   });
 }
 
@@ -33,6 +34,11 @@ function AirPlane () {
     this.setAccele = function(ax, ay, az) {
         _this.a_x = (ay/90.0);
         _this.a_y = (ax/90.0);
+    };
+    
+    this.setAcceleByMouse = function(x, y) {
+        _this.a_x = (x - _this.x) / _this.alpha_x;
+        _this.a_y = (y - _this.y) / _this.alpha_y;
     };
   
     this.draw = function (ctx) {
@@ -82,10 +88,15 @@ function Bullet () {
 
 function Circle () {
     var _this = this;
-    this.x            = 100;
+    this.x            = 0;
     this.y            = 0;
     this.r            = 20;
     this.fall_step    = 2;
+    
+    this.set = function (w) {
+        _this.x = 20 + Math.round( (w-40) * Math.random());
+        _this.y = 0;
+    };
 
     this.move = function move () {
         _this.y += _this.fall_step;
@@ -95,11 +106,6 @@ function Circle () {
         ctx.beginPath();
         ctx.arc(_this.x, _this.y, _this.r, 0, Math.PI * 2, false);
         ctx.stroke();
-    };
-  
-    this.reset = function (w) {
-        _this.x = Math.round(w * Math.random());
-        _this.y = 0;
     };
 
     this.detect_collisoin = function (x, y, cb) {
@@ -127,7 +133,7 @@ function CircleFall () {
   // Objects
   this.airplane = new AirPlane();
   this.bullets  = new Array();
-  this.circle   = new Circle();
+  this.circles  = new Array();
 
   // Score
   this.total_score     = 0;
@@ -136,14 +142,14 @@ function CircleFall () {
   // Control
   this.total_circle_num = 0;
   this.max_circle_num   = 100;
-  this.interval = 10;
+  this.main_interval   = 10;
+  this.circle_interval = 700;
 
   // Socket
   this.socket;
 
   this.init = function () {
     _this.socket = io.connect("http://node.comonsense.net");
-    
     _this.socket.on("sendMessageToClient", function (data) {
         if(data.X) {
           _this.airplane.setAccele(data.X, data.Y); 
@@ -153,11 +159,19 @@ function CircleFall () {
           _this.fire_bullet(); 
         }
     });
+
+    document.addEventListener('mousemove', function (e) {
+        _this.airplane.setAcceleByMouse(e.clientX, e.clientY); 
+    });
+    
+    document.addEventListener('click', function (e) {
+        _this.fire_bullet(); 
+    });
   };
 
   this.loop = function () {
     var score = 0;
-    var r, k;
+    var r, k, c;
     
     _this.ctx.clearRect(0, 0 , _this.canvas.width, _this.canvas.height);
     
@@ -172,20 +186,22 @@ function CircleFall () {
     }
     
     for (k in _this.bullets) {  
-        r = _this.circle.detect_collisoin(_this.bullets[k].x, _this.bullets[k].y, function (circle) {
-            _this.destruction_sound.currentTime = 0;
-            _this.destruction_sound.play();
-            return _this.score_per_break;
-        });
+        for (c in _this.circles) {
+            r = _this.circles[c].detect_collisoin(_this.bullets[k].x, _this.bullets[k].y, function (circle) {
+                _this.destruction_sound.currentTime = 0;
+                _this.destruction_sound.play();
+                return _this.score_per_break;
+            });
 
-        if (r > 0) {
-            score += r;
-            _this.bullets.splice(k, 1); 
+            if (r > 0) {
+                score += r;
+                _this.bullets.splice(k, 1); 
+                _this.circles.splice(c, 1); 
+            }
         }
     };
     if (score > 0) {
         _this.total_score += score;
-        _this.circle.reset(_this.canvas.width);
         _this.total_circle_num += 1;
     }
 
@@ -195,25 +211,28 @@ function CircleFall () {
     _this.airplane.draw(_this.ctx);
     
     // Circle Control
-    _this.circle.move();
-    _this.circle.draw(_this.ctx);
+    for (c in _this.circles) {
+        _this.circles[c].move();
     
-    r = _this.circle.detect_collisoin(_this.airplane.x, _this.airplane.y, function (circle) {
-        _this.bomb_sound.currentTime = 0;
-        _this.bomb_sound.play();
-        return 1;
-    }); 
-    if (r) {
-        _this.ctx.clearRect(0, 0, _this.canvas.width, _this.canvas.height);
-        _this.end_score();
-        return;
+        if (_this.circles[c].y > _this.canvas.height) {
+            _this.circles.splice(c, 1); 
+            _this.total_circle_num += 1;
+        }
+        
+        r = _this.circles[c].detect_collisoin(_this.airplane.x, _this.airplane.y, function (circle) {
+            _this.bomb_sound.currentTime = 0;
+            _this.bomb_sound.play();
+            return 1;
+        }); 
+        if (r) {
+            _this.ctx.clearRect(0, 0, _this.canvas.width, _this.canvas.height);
+            _this.end_score();
+            return;
+        }
+        
+        _this.circles[c].draw(_this.ctx);
     }
     
-    if (_this.circle.y > _this.canvas.height) {
-        _this.circle.reset(_this.canvas.width);
-        _this.total_circle_num += 1;
-    }
-   
 
     // Main Control
     _this.update_score();
@@ -237,13 +256,23 @@ function CircleFall () {
   
   this.setNextLoop = function () {
     clearTimeout();
-    setTimeout(function () { _this.loop(); }, _this.interval);
+    setTimeout(function () { _this.loop(); }, _this.main_interval);
+  };
+
+  this.generate_circle = function () {
+      var c =  new Circle();
+      c.set(_this.canvas.width);
+      _this.circles.push(c);
+
+      clearTimeout();
+      setTimeout(function () { _this.generate_circle(); }, _this.circle_interval);
   };
   
   this.reset = function () {
-    _this.circle.reset(_this.canvas.width);
-    _this.total_circle_num = 0;
-    _this.total_score      = 0;
+      _this.bullets = new Array();
+      _this.circles = new Array();
+      _this.total_circle_num = 0;
+      _this.total_score      = 0;
   };
 
   this.update_score = function () {
