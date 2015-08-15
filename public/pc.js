@@ -8,15 +8,16 @@ window.onload = function() {
   });
 }
 
-function AirPlane () {
+function AirPlane (canvas) {
     var _this = this;
     this.x = 250;
     this.y = 400 ;
     this.a_x = 0;
     this.a_y = 0 ;
-    this.alpha_x   = 15.0;
-    this.alpha_y   = 15.0;
-    this.viscosity = 0.9;
+    this.alpha_x   = 20.0;
+    this.alpha_y   = 20.0;
+    this.viscosity = 1.0;
+    this.canvas = canvas;
     
     this.height = 30;
     this.width  = 30;
@@ -24,16 +25,23 @@ function AirPlane () {
     this.image.src = "./icon/airplane.png";
 
     this.move = function(x, y) {
-        _this.x += _this.a_x * _this.alpha_x;
-        _this.y += _this.a_y * _this.alpha_y;
+        var next_x = _this.x + _this.a_x * _this.alpha_x;
+        if ( 0 < next_x && next_x < _this.canvas.width) { 
+            _this.x = next_x;
+        }
+        
+        var next_y = _this.y + _this.a_y * _this.alpha_y;
+        if ( 0 < next_y  && next_y < _this.canvas.height) { 
+            _this.y = next_y;
+        }
 
         _this.a_x *= _this.viscosity;
         _this.a_y *= _this.viscosity;
     };
     
     this.setAccele = function(ax, ay, az) {
-        _this.a_x = (ay/90.0);
-        _this.a_y = (ax/90.0);
+        _this.a_x = (ax/90.0);
+        _this.a_y = -(ay/90.0);
     };
     
     this.setAcceleByMouse = function(x, y) {
@@ -123,7 +131,7 @@ function CircleFall () {
   this.canvas        = document.getElementById('cvs');
   this.ctx           = this.canvas.getContext('2d');
   this.score_div     = document.getElementById('score');
-  this.canvas.height = 600;
+  this.canvas.height = 500;
   this.canvas.width  = 500;
 
   // Sound
@@ -131,7 +139,7 @@ function CircleFall () {
   this.bomb_sound = document.getElementById('bomb_sound');
 
   // Objects
-  this.airplane = new AirPlane();
+  this.airplane = new AirPlane(_this.canvas);
   this.bullets  = new Array();
   this.circles  = new Array();
 
@@ -142,8 +150,8 @@ function CircleFall () {
   // Control
   this.total_circle_num = 0;
   this.max_circle_num   = 100;
-  this.main_interval   = 10;
-  this.circle_interval = 700;
+  this.main_interval    = 16;
+  this.circle_interval  = 1000;
 
   // Socket
   this.socket;
@@ -172,6 +180,7 @@ function CircleFall () {
   this.loop = function () {
     var score = 0;
     var r, k, c;
+    var flag = 0;
     
     _this.ctx.clearRect(0, 0 , _this.canvas.width, _this.canvas.height);
     
@@ -185,7 +194,7 @@ function CircleFall () {
         }
     }
     
-    for (k in _this.bullets) {  
+    for (k in _this.bullets) {
         for (c in _this.circles) {
             r = _this.circles[c].detect_collisoin(_this.bullets[k].x, _this.bullets[k].y, function (circle) {
                 _this.destruction_sound.currentTime = 0;
@@ -195,9 +204,13 @@ function CircleFall () {
 
             if (r > 0) {
                 score += r;
-                _this.bullets.splice(k, 1); 
                 _this.circles.splice(c, 1); 
+                flag = 1;
             }
+        }
+        if (flag === 1) {
+            _this.bullets.splice(k, 1);
+            flag = 0;
         }
     };
     if (score > 0) {
