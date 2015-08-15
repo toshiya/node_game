@@ -5,20 +5,31 @@ window.onload = function() {
     g.reset(); 
     g.loop(); 
   });
+  
 }
 
 function AirPlane () {
     var _this = this;
-    this.x = 150;
+    this.x = 500;
     this.y = 400 ;
+    this.a_x = 0;
+    this.a_y = 0 ;
+    this.alpha_x = 10.0;
+    this.alpha_y = 10.0;
+    
     this.height = 30;
     this.width  = 30;
     this.image  = new Image();
-    this.image.src = "./assets/icon/airplane.png";
+    this.image.src = "./icon/airplane.png";
 
-    this.move = function(e) {
-        _this.x = e.clientX;
-        _this.y = e.clientY;
+    this.move = function(x, y) {
+        _this.x += _this.a_x * _this.alpha_x;
+        _this.y += _this.a_y * _this.alpha_y;
+    };
+    
+    this.setAccele = function(ax, ay, az) {
+        _this.a_x = (ay/90.0);
+        _this.a_y = (ax/90.0);
     };
   
     this.draw = function (ctx) {
@@ -103,8 +114,8 @@ function CircleFall () {
   this.canvas        = document.getElementById('cvs');
   this.ctx           = this.canvas.getContext('2d');
   this.score_div     = document.getElementById('score');
-  this.canvas_height = 400;
-  this.canvas_width  = 300;
+  this.canvas_height = 600;
+  this.canvas_width  = 1000;
 
   // Sound
   this.destruction_sound = document.getElementById('destruction_sound');
@@ -124,14 +135,29 @@ function CircleFall () {
   this.max_circle_num   = 100;
   this.interval = 10;
 
+  // Socket
+  this.socket;
+
   this.init = function () {
-    document.addEventListener('mousemove', _this.airplane.move);
+    //document.addEventListener('mousemove', _this.airplane.moveTo);
     document.addEventListener('click', _this.fire_bullet);
+    _this.socket = io.connect("http://node.comonsense.net");
+    
+    _this.socket.on("sendMessageToClient", function (data) {
+        if(data.X) {
+          _this.airplane.setAccele(data.X, data.Y); 
+        }
+        
+        if(data.touch) {
+          _this.fire_bullet(); 
+        }
+    });
   };
 
   this.loop = function () {
     _this.ctx.clearRect(0, 0 , _this.canvas_width, _this.canvas_height);
 
+    _this.airplane.move();
     _this.bullet.move();
     _this.circle.move();
     
