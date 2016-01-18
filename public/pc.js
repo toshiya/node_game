@@ -74,7 +74,7 @@ function AirPlane (canvas) {
 AirPlane.prototype             = new DisplayObject;
 AirPlane.prototype.constructor = AirPlane;
 AirPlane.prototype.image       = new Image();
-AirPlane.prototype.image.src   = "./icon/airplane.png";
+AirPlane.prototype.image.src   = "public/icon/airplane.png";
 AirPlane.prototype.bombSound   = document.getElementById('bomb_sound');
 
 function Bullet () {
