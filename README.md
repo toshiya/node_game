@@ -1,3 +1,3 @@
 # Play Url
 
-https://toshiya.github.io/node_game
+https://toshiya.github.io/toy_games
