@@ -74,7 +74,7 @@ function AirPlane (canvas) {
 AirPlane.prototype             = new DisplayObject;
 AirPlane.prototype.constructor = AirPlane;
 AirPlane.prototype.image       = new Image();
-AirPlane.prototype.image.src   = "./icon/airplane.png";
+AirPlane.prototype.image.src   = "public/icon/airplane.png";
 AirPlane.prototype.bombSound   = document.getElementById('bomb_sound');
 
 function Bullet () {
@@ -163,20 +163,8 @@ function CircleFall () {
     this.max_circle_num   = 100;
     this.main_interval    = 16;
     this.circle_interval  = 1000;
-    //this.socket;
 
     this.init = function () {
-        //_this.socket = io.connect("http://node.comonsense.net");
-        //_this.socket.on("sendMessageToClient", function (data) {
-        //    if(data.X) {
-        //        _this.airplane.setAccele(data.X, data.Y); 
-        //    }
-
-        //    if(data.touch) {
-        //        _this.fire_bullet(); 
-        //    }
-        //});
-
         document.addEventListener('mousemove', function (e) {
             _this.airplane.setAcceleByMouse(e.clientX, e.clientY); 
         });
